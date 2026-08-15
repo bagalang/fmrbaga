@@ -215,3 +215,7 @@ if email.ok == 0 {
 - HTTP/1.1 only in the framework loop (h2 stays in httpdbaga).
 - Runtime gauges are best-effort (shared map without mutex; fine for ops).
 - OpenAPI has real schemas + Bearer security; not every error variant is listed.
+
+## License
+
+[MIT](LICENSE) — Copyright (c) 2026 Dim Gigov.
