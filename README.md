@@ -3,6 +3,25 @@
 **Baga web framework** — HTTP/JSON APIs with route-id dispatch, env config,
 multi-thread workers, OpenAPI, JWT, and Postgres via ormbaga.
 
+This repository is the framework. The compiler, `std`, `httpdbaga`,
+`jwtbaga`, `ormbaga`, `otelbaga`, `logbaga`, and `metbaga` stay in the
+baga language monorepo. Check this tree out as `app-product/fmrbaga`
+there (git submodule) so path deps and `-I app-product` keep working.
+
+## Checkout
+
+Inside a baga language clone:
+
+```bash
+git submodule update --init app-product/fmrbaga
+# or, first time from a fresh baga tree without the submodule recorded:
+git clone git@github.com:bagalang/fmrbaga.git app-product/fmrbaga
+```
+
+`sandak.toml` keeps path deps so the shared packages stay in baga.
+`apps/api`, `apps/registry`, `tests/fmr_test.baga`, and
+`tests/fmr_route_fn_test.baga` also stay in baga.
+
 | Want | Go here |
 |------|---------|
 | **Architecture** | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
