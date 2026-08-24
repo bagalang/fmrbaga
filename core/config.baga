@@ -30,10 +30,23 @@ fn fmr_cfg_or(name: str, def: str) -> str !IO {
 
 fn fmr_cfg_flag(name: str) -> i64 !IO {
     let v = env(name)?
-    if v == "1" || v == "true" || v == "yes" {
+    let low = to_lower(v)
+    if v == "1" || low == "true" || low == "yes" {
         return 1
     }
     return 0
+}
+
+// Listen/DB port: 1..65535 else default. parse_int("abc") is 0.
+fn fmr_port_parse(raw: str, def: i64) -> i64 {
+    if raw == "" {
+        return def
+    }
+    let p = parse_int(raw)
+    if p < 1 || p > 65535 {
+        return def
+    }
+    return p
 }
 
 // True when ORM_BACKEND targets boilaDB (PG wire via boilabaga).
@@ -69,7 +82,7 @@ fn fmr_config_load() -> FmrConfig !IO {
         secret = j2
     }
     let mut host = fmr_cfg_or("PGHOST", "127.0.0.1")?
-    let mut port = parse_int(fmr_cfg_or("PGPORT", "5432")?)
+    let mut port = fmr_port_parse(fmr_cfg_or("PGPORT", "5432")?, 5432)
     let mut user = fmr_cfg_or("PGUSER", "bagatest")?
     let mut password = fmr_cfg_or("PGPASSWORD", "pas+123")?
     let mut database = fmr_cfg_or("PGDATABASE", "baga_orm")?
@@ -83,7 +96,7 @@ fn fmr_config_load() -> FmrConfig !IO {
         }
         let bp = env("BOILA_PGPORT")?
         if bp != "" {
-            port = parse_int(bp)
+            port = fmr_port_parse(bp, 6575)
         } else {
             port = 6575
         }
@@ -112,7 +125,7 @@ fn fmr_config_load() -> FmrConfig !IO {
         }
     }
     return FmrConfig {
-        port: parse_int(fmr_cfg_or("PORT", "8080")?),
+        port: fmr_port_parse(fmr_cfg_or("PORT", "8080")?, 8080),
         workers: workers,
         sync: sync,
         jwt_secret: secret,

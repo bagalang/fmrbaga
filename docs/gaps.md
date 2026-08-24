@@ -63,6 +63,11 @@ app-defined hook (`fmr_before`) plus the built-in correlation chain.
 thread). Explicit `FMR_WORKERS=0` keeps go_bg-per-conn. Shared stats track
 inflight/accepted/completed.
 
+## G9 — PORT clamp — **closed 2026-08-24**
+
+`fmr_port_parse` for `PORT` / `PGPORT` / `BOILA_PGPORT` (1..65535).
+`fmr_cfg_flag` accepts `True`/`YES` via ASCII fold.
+
 ## G8 — Combined program size
 
 **Symptom.** Full serve unit is large (many imports); compile times grow.
