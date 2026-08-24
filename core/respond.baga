@@ -4,23 +4,6 @@ import "httpdbaga/http.baga"
 import "../json/jsonx.baga"
 import "std/str/str.baga"
 
-// Expand reason phrases for API statuses used by the framework.
-fn fmr_reason(status: i64) -> str {
-    if status == 200 { return "OK" }
-    if status == 201 { return "Created" }
-    if status == 204 { return "No Content" }
-    if status == 400 { return "Bad Request" }
-    if status == 401 { return "Unauthorized" }
-    if status == 403 { return "Forbidden" }
-    if status == 404 { return "Not Found" }
-    if status == 405 { return "Method Not Allowed" }
-    if status == 409 { return "Conflict" }
-    if status == 422 { return "Unprocessable Entity" }
-    if status == 500 { return "Internal Server Error" }
-    if status == 503 { return "Service Unavailable" }
-    return "Status"
-}
-
 fn fmr_json(status: i64, body: str) -> Response {
     let mut r = http_json_response(status, body)
     // framework fingerprint (can be disabled later)

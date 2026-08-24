@@ -105,16 +105,6 @@ fn oas_bearer_security() -> str {
     return jarr_encode(arr)
 }
 
-fn oas_path_id_param() -> JObj {
-    let mut p = jobj_new()
-    p = jobj_str(p, "name", "id")
-    p = jobj_str(p, "in", "path")
-    p = jobj_bool(p, "required", 1)
-    p = jobj_str(p, "description", "User id")
-    p = jobj_obj(p, "schema", oas_int_schema())
-    return p
-}
-
 // ---------- components ----------
 
 fn oas_components() -> JObj {
@@ -262,29 +252,6 @@ fn oas_add_json_body(op: JObj, schema_name: str, required: i64) -> JObj {
     body = jobj_bool(body, "required", required)
     body = jobj_obj(body, "content", oas_json_content(oas_ref(schema_name)))
     return jobj_obj(op, "requestBody", body)
-}
-
-fn oas_add_resp(op: JObj, code: str, desc: str, schema_name: str) -> JObj {
-    // merge into responses if present
-    // we rebuild responses each time — callers chain carefully
-    return op
-}
-
-// Build full responses map for common patterns.
-fn oas_responses_ok(schema_name: str) -> JObj {
-    let mut r = jobj_new()
-    r = jobj_obj(r, "200", oas_response_ref("OK", schema_name))
-    r = jobj_obj(r, "401", oas_response_ref("Unauthorized", "Error"))
-    r = jobj_obj(r, "422", oas_response_ref("Validation Error", "HTTPValidationError"))
-    r = jobj_obj(r, "500", oas_response_ref("Server Error", "Error"))
-    return r
-}
-
-fn oas_responses_public(schema_name: str) -> JObj {
-    let mut r = jobj_new()
-    r = jobj_obj(r, "200", oas_response_ref("OK", schema_name))
-    r = jobj_obj(r, "503", oas_response_ref("Unavailable", "Error"))
-    return r
 }
 
 // ---------- B2.4: emit paths from Router ----------

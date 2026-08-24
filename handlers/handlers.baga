@@ -26,20 +26,27 @@ fn RID_ME() -> i64 { return 11 }
 
 fn h_health(ctx: FmrCtx, db: OrmDb) -> FmrOut
 fn h_ready(ctx: FmrCtx, db: OrmDb) -> FmrOut !IO !Net
-fn h_meta(ctx: FmrCtx, db: OrmDb) -> FmrOut !IO
-fn h_openapi(ctx: FmrCtx, db: OrmDb) -> FmrOut !IO
+fn h_meta(ctx: FmrCtx, db: OrmDb) -> FmrOut
+fn h_openapi(ctx: FmrCtx, db: OrmDb) -> FmrOut
 fn h_token(ctx: FmrCtx, db: OrmDb) -> FmrOut
 fn h_me(ctx: FmrCtx, db: OrmDb) -> FmrOut
 
 fn fmr_build_app() -> FmrApp !IO {
     let mut app = fmr_app_from_env("fmrbaga", "0.1.0")?
-    app = fmr_route_fn(app, "GET", "/health", RID_HEALTH(), h_health)
-    app = fmr_route_fn(app, "GET", "/ready", RID_READY(), h_ready)
-    app = fmr_route_fn(app, "GET", "/readyz", RID_READY(), h_ready)
-    app = fmr_route_fn(app, "GET", "/v1/meta", RID_META(), h_meta)
-    app = fmr_route_fn(app, "GET", "/openapi.json", RID_OPENAPI(), h_openapi)
-    app = fmr_route_fn(app, "POST", "/v1/auth/token", RID_TOKEN(), h_token)
-    app = fmr_route_fn(app, "GET", "/v1/me", RID_ME(), h_me)
+    app = fmr_route_fn_meta(app, "GET", "/health", RID_HEALTH(), h_health,
+        "", "system", 1, "", "Status", "200", "")
+    app = fmr_route_fn_meta(app, "GET", "/ready", RID_READY(), h_ready,
+        "", "system", 1, "", "Ready", "200", "")
+    app = fmr_route_fn_meta(app, "GET", "/readyz", RID_READY(), h_ready,
+        "", "system", 1, "", "Ready", "200", "")
+    app = fmr_route_fn_meta(app, "GET", "/v1/meta", RID_META(), h_meta,
+        "", "system", 1, "", "Status", "200", "")
+    app = fmr_route_fn_meta(app, "GET", "/openapi.json", RID_OPENAPI(), h_openapi,
+        "", "system", 1, "", "-", "200", "")
+    app = fmr_route_fn_meta(app, "POST", "/v1/auth/token", RID_TOKEN(), h_token,
+        "", "auth", 1, "TokenRequest?", "TokenResponse", "200", "sub:s")
+    app = fmr_route_fn_meta(app, "GET", "/v1/me", RID_ME(), h_me,
+        "", "auth", 0, "", "Me", "200", "")
     return app
 }
 
@@ -81,20 +88,18 @@ fn h_ready(ctx: FmrCtx, db: OrmDb) -> FmrOut !IO !Net {
     return fmr_out(fmr_ok_obj(o), orm_db_q(q))
 }
 
-fn h_meta(ctx: FmrCtx, db: OrmDb) -> FmrOut !IO {
-    let app = fmr_build_app()?
+fn h_meta(ctx: FmrCtx, db: OrmDb) -> FmrOut {
     let mut o = jobj_new()
-    o = jobj_str(o, "title", app.title)
-    o = jobj_str(o, "version", app.version)
+    o = jobj_str(o, "title", ctx.title)
+    o = jobj_str(o, "version", ctx.version)
     o = jobj_str(o, "framework", "fmrbaga")
     o = jobj_str(o, "openapi", "/openapi.json")
     o = jobj_str(o, "note", "universal scaffold — product routes live in apps/*")
     return fmr_out(fmr_ok_obj(o), db)
 }
 
-fn h_openapi(ctx: FmrCtx, db: OrmDb) -> FmrOut !IO {
-    let app = fmr_build_app()?
-    let doc = fmr_openapi_from_router(app.router, app.title, app.version)
+fn h_openapi(ctx: FmrCtx, db: OrmDb) -> FmrOut {
+    let doc = fmr_openapi_from_router(ctx.router, ctx.title, ctx.version)
     return fmr_out(fmr_ok_obj(doc), db)
 }
 
@@ -153,10 +158,10 @@ fn fmr_dispatch(ctx: FmrCtx, db: OrmDb) -> FmrOut !IO !Net {
         return h_ready(ctx, db)?
     }
     if id == RID_META() {
-        return h_meta(ctx, db)?
+        return h_meta(ctx, db)
     }
     if id == RID_OPENAPI() {
-        return h_openapi(ctx, db)?
+        return h_openapi(ctx, db)
     }
     if id == RID_TOKEN() {
         return h_token(ctx, db)

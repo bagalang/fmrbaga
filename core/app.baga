@@ -171,6 +171,25 @@ fn fmr_route_fn(app: FmrApp, method: str, pattern: str, id: i64,
     return a
 }
 
+// Route + OpenAPI metadata (see router_add_meta in core/route.baga).
+fn fmr_route_meta(app: FmrApp, method: str, pattern: str, id: i64,
+        summary: str, tag: str, public: i64, body: str, ok: str, code: str, query: str) -> FmrApp {
+    return fmr_app_copy(app, router_add_meta(app.router, method, pattern, id,
+            summary, tag, public, body, ok, code, query),
+        app.jwt_secret, app.title, app.version,
+        app.pg_host, app.pg_port, app.pg_user, app.pg_password, app.pg_database,
+        app.cors_origin, app.log_requests)
+}
+
+// Route + handler + OpenAPI metadata in one registration.
+fn fmr_route_fn_meta(app: FmrApp, method: str, pattern: str, id: i64,
+                h: fn(FmrCtx, OrmDb) -> FmrOut !IO !Net,
+        summary: str, tag: str, public: i64, body: str, ok: str, code: str, query: str) -> FmrApp {
+    let mut a = fmr_route_meta(app, method, pattern, id, summary, tag, public, body, ok, code, query)
+    a.handlers = fmr_handlers_add(a.handlers, id, h)
+    return a
+}
+
 // Apply FmrConfig (from config.baga) onto app shell.
 fn fmr_app_with_config(app: FmrApp, cfg: FmrConfig) -> FmrApp {
     let mut a = fmr_app_jwt(app, cfg.jwt_secret)
@@ -258,12 +277,9 @@ fn fmr_handle(app: FmrApp, req: Request, db: OrmDb) -> FmrOut !Random !Time !IO 
     let rid = fmr_make_request_id(req)?
 
     if method == "OPTIONS" {
-        let origin = app.cors_origin
         let mut r = fmr_no_content()
-        if origin == "" {
-            r = fmr_cors(r, "*")
-        } else {
-            r = fmr_cors(r, origin)
+        if app.cors_origin != "" {
+            r = fmr_cors(r, app.cors_origin)
         }
         return fmr_out(fmr_with_request_id(r, rid), db)
     }
@@ -291,7 +307,7 @@ fn fmr_handle(app: FmrApp, req: Request, db: OrmDb) -> FmrOut !Random !Time !IO 
         return fmr_out(fmr_finish(app, fmr_404("Not found"), rid), db)
     }
 
-    let ctx0 = fmr_mw_ids(fmr_ctx_new(req, m, app.jwt_secret), rid)?
+    let ctx0 = fmr_mw_ids(fmr_ctx_new_app(req, m, app.jwt_secret, app.title, app.version, app.router), rid)?
     let before = fmr_before(ctx0)
     if before.ok == 0 {
         // Prefer ids from ctx0 (middleware); before.ctx may be a short-circuit copy.

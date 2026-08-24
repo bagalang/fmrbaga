@@ -4,7 +4,8 @@ import "httpdbaga/http.baga"
 import "route.baga"
 import "std/str/str.baga"
 
-// Per-request context. App state (JWT secret, DSN bits) is copied from FmrApp.
+// Per-request context. App state (JWT secret, title/version/router) is copied
+// from FmrApp at request start (fmr_ctx_new_app) so handlers never re-load env.
 // DB is held outside and threaded by the server (one OrmDb per TCP connection).
 struct FmrCtx {
     req: Request,
@@ -12,6 +13,9 @@ struct FmrCtx {
     pnames: Vec<str>,
     pvals: Vec<str>,
     jwt_secret: str,
+    title: str,
+    version: str,
+    router: Router,
     // filled by deps / handlers
     user_sub: str,
     authed: i64,
@@ -22,12 +26,21 @@ struct FmrCtx {
 }
 
 fn fmr_ctx_new(req: Request, m: RouteMatch, jwt_secret: str) -> FmrCtx {
+    return fmr_ctx_new_app(req, m, jwt_secret, "", "", router_new())
+}
+
+// App-aware context: handlers can reach title/version/router without !IO.
+fn fmr_ctx_new_app(req: Request, m: RouteMatch, jwt_secret: str,
+        title: str, version: str, router: Router) -> FmrCtx {
     return FmrCtx {
         req: req,
         route_id: m.id,
         pnames: m.pnames,
         pvals: m.pvals,
         jwt_secret: jwt_secret,
+        title: title,
+        version: version,
+        router: router,
         user_sub: "",
         authed: 0,
         req_id: "",
@@ -81,12 +94,28 @@ fn fmr_ctx_copy(ctx: FmrCtx, user_sub: str, authed: i64, req_id: str, trace_id: 
         pnames: ctx.pnames,
         pvals: ctx.pvals,
         jwt_secret: ctx.jwt_secret,
+        title: ctx.title,
+        version: ctx.version,
+        router: ctx.router,
         user_sub: user_sub,
         authed: authed,
         req_id: req_id,
         trace_id: trace_id,
         span_id: span_id
     }
+}
+
+// App state from context (set once by fmr_handle; no env in handlers).
+fn fmr_title(ctx: FmrCtx) -> str {
+    return ctx.title
+}
+
+fn fmr_version(ctx: FmrCtx) -> str {
+    return ctx.version
+}
+
+fn fmr_router(ctx: FmrCtx) -> Router {
+    return ctx.router
 }
 
 fn fmr_set_user(ctx: FmrCtx, sub: str) -> FmrCtx {

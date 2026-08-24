@@ -41,9 +41,13 @@ were written as multi-byte UTF-8 via `chr()` in `poke8`.
 response schema names). `GET /openapi.json` uses the app's registered
 routes. Schemas stay in `oas_components()`. Ops carry `x-baga-route-id`.
 
-**Residual.** Full per-op prose still heuristic (not a second hand table);
-new resources need body/ok schema name rules in `oas_body_schema` /
-`oas_ok_schema` for rich refs.
+**Residual — closed 2026-08-24.** Per-route metadata (`router_add_meta` /
+`fmr_route_meta` / `fmr_route_fn_meta`) is now the source of per-op prose:
+summary, tag, public/security, body schema (`Name?` = optional), ok schema
+(`-` = empty), success code, and query params (`name` / `name:s`). The old
+hand tables for `/v1/users` and `/v1/posts` are gone from the framework;
+heuristic fallback covers only the scaffold ops routes. New resources no
+longer need edits in `openapi/*.baga`.
 
 ## G6 — Middleware stack (partial — B2.1)
 

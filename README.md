@@ -112,19 +112,27 @@ FMR_SYNC=1 ./scripts/fmr-run
 
 ## Route model
 
-Baga has no function values → routes are **integer ids**; the app implements
-`fmr_dispatch(ctx, db)`, or register `fmr_route_fn(..., handler)` and skip
-the switch.
+Routes are **integer ids**; the app implements `fmr_dispatch(ctx, db)`, or
+registers `fmr_route_fn(..., handler)` and skips the switch. Route-level
+**OpenAPI metadata** rides on the same registration
+(`fmr_route_meta` / `fmr_route_fn_meta`); the framework carries no product
+route knowledge — every body/ok schema, tag and security flag comes from
+your route table (see `core/route.baga` `router_add_meta` for field
+semantics).
 
 ```baga
-fmr_route_fn(app, "GET", "/users/{id}", RID_USER_GET, h_user_get)
-// or fmr_route(...) + branch in fmr_dispatch (product apps today)
+fmr_route_fn_meta(app, "GET", "/users/{id}", RID_USER_GET, h_user_get,
+    "Show one user", "users", 0, "", "User", "200", "")
+// or fmr_route_meta(...) + branch in fmr_dispatch (product apps today)
 // …
 match rid {
     RID_USER_GET => act_user_get(ctx, db),
     // …
 }
 ```
+
+Duplicate `METHOD pattern` registrations are a **startup error**
+(`router_validate` in `fmr_run`) — fail-loud instead of first-match-wins.
 
 | Concern | fmrbaga |
 |---------|---------|
@@ -133,6 +141,7 @@ match rid {
 | Errors | `fmr_error(status, detail)` |
 | Auth | `deps_bearer(ctx)` / `act_require_auth` |
 | JSON response | `fmr_jobj` / `fmr_json` / `act_ok` |
+| App state in handlers | `fmr_title(ctx)` / `fmr_version(ctx)` / `fmr_router(ctx)` (no env reload per request) |
 | Boot (products) | own `migrate_up` then `fmr_run()` |
 
 ## Scaffold routes (`handlers/` — not a product)
@@ -182,8 +191,8 @@ curl -s -X POST localhost:8080/v1/auth/token -H 'Content-Type: application/json'
 ## Add a route
 
 1. New `RID_*` constant in your dispatch file  
-2. `fmr_route_fn(app, "METHOD", "/path/{id}", RID, handler)` in `fmr_build_app`  
-   (or `fmr_route` + branch in `fmr_dispatch`)  
+2. `fmr_route_fn_meta(app, "METHOD", "/path/{id}", RID, handler, summary, tag, public, body, ok, code, query)` in `fmr_build_app`  
+   (or `fmr_route_meta` + branch in `fmr_dispatch`)  
 3. Handler uses `fmr_param` / `jreq_*` / `orm_*`
 
 ## JSON
@@ -209,12 +218,18 @@ if email.ok == 0 {
 ## OpenAPI 3
 
 `GET /openapi.json` — built from the live route table (`fmr_openapi_from_router`).
+Per-route metadata (summary/tag/public/body/ok/code/query — see
+`core/route.baga`) drives the document; the framework's fallback heuristics
+cover only its own scaffold routes (`/health`, `/ready`, `/v1/meta`,
+`/openapi.json`, `/v1/auth/token`, `/v1/me`).
 
 ## Honesty
 
 - HTTP/1.1 only in the framework loop (h2 stays in httpdbaga).
 - Runtime gauges are best-effort (shared map without mutex; fine for ops).
 - OpenAPI has real schemas + Bearer security; not every error variant is listed.
+- CORS headers (incl. OPTIONS preflight answers) are emitted only when
+  `FMR_CORS` is set — disabled CORS means no CORS headers at all.
 
 ## License
 

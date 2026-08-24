@@ -6,18 +6,91 @@ import "std/str/str.baga"
 struct Router {
     methods: Vec<str>,
     patterns: Vec<str>,
-    ids: Vec<i64>
+    ids: Vec<i64>,
+    // OpenAPI meta per route (parallel vecs). "" = unset; public -1 = unset.
+    summaries: Vec<str>,
+    tags: Vec<str>,
+    publics: Vec<i64>,
+    body_schemas: Vec<str>,
+    ok_schemas: Vec<str>,
+    codes: Vec<str>,
+    queries: Vec<str>
 }
 
 fn router_new() -> Router {
-    return Router { methods: vec_new(), patterns: vec_new(), ids: vec_new() }
+    return Router {
+        methods: vec_new(), patterns: vec_new(), ids: vec_new(),
+        summaries: vec_new(), tags: vec_new(), publics: vec_new(),
+        body_schemas: vec_new(), ok_schemas: vec_new(), codes: vec_new(), queries: vec_new()
+    }
 }
 
 fn router_add(r: Router, method: str, pattern: str, id: i64) -> Router {
+    return router_add_meta(r, method, pattern, id, "", "", -1, "", "", "", "")
+}
+
+// Route + OpenAPI metadata (see openapi/openapi.baga for field meanings):
+//   summary  — operation summary ("" = generated "METHOD pattern")
+//   tag      — OpenAPI tag ("" = derived from path)
+//   public   — 1 = no Bearer; 0 = Bearer; -1 = heuristic
+//   body     — request body schema name; "Name?" = optional
+//   ok       — 200/2xx response schema name; "-" = empty body; "" = heuristic
+//   code     — success status code as text ("" = heuristic)
+//   query    — comma list of query params: "name" (int) / "name:s" (string)
+fn router_add_meta(r: Router, method: str, pattern: str, id: i64,
+        summary: str, tag: str, public: i64, body: str, ok: str, code: str, query: str) -> Router {
     vec_push(r.methods, method)
     vec_push(r.patterns, pattern)
     vec_push(r.ids, id)
+    vec_push(r.summaries, summary)
+    vec_push(r.tags, tag)
+    vec_push(r.publics, public)
+    vec_push(r.body_schemas, body)
+    vec_push(r.ok_schemas, ok)
+    vec_push(r.codes, code)
+    vec_push(r.queries, query)
     return r
+}
+
+struct RouteMeta {
+    summary: str,
+    tag: str,
+    public: i64,   // -1 = unset
+    body: str,
+    ok: str,
+    code: str,
+    query: str
+}
+
+fn router_meta(r: Router, i: i64) -> RouteMeta {
+    return RouteMeta {
+        summary: vec_get(r.summaries, i),
+        tag: vec_get(r.tags, i),
+        public: vec_get(r.publics, i),
+        body: vec_get(r.body_schemas, i),
+        ok: vec_get(r.ok_schemas, i),
+        code: vec_get(r.codes, i),
+        query: vec_get(r.queries, i)
+    }
+}
+
+// Fail-loud startup check: registering the same METHOD + pattern twice is a
+// bug (first match silently wins at dispatch time). "" = OK; else the first
+// duplicate named.
+fn router_validate(r: Router) -> str {
+    for i in 0..vec_len(r.ids) {
+        let mut j: i64 = i + 1
+        while j < vec_len(r.ids) {
+            if vec_get(r.methods, i) == vec_get(r.methods, j) {
+                if vec_get(r.patterns, i) == vec_get(r.patterns, j) {
+                    return concat(concat("duplicate route: ", vec_get(r.methods, i)),
+                        concat(" ", vec_get(r.patterns, i)))
+                }
+            }
+            j = j + 1
+        }
+    }
+    return ""
 }
 
 // Split path into segments; empty leading segment from "/" is dropped.
@@ -99,10 +172,8 @@ fn router_match(r: Router, method: str, path: str) -> RouteMatch {
 
 // Method not allowed? true if path matches some pattern with different method.
 fn router_path_exists(r: Router, path: str) -> i64 {
+    let ps = route_segments(path)
     for i in 0..vec_len(r.ids) {
-        let m = route_match_one("GET", path, "GET", vec_get(r.patterns, i), vec_get(r.ids, i))
-        // check pattern only: reuse segments compare with dummy method always fail method
-        let ps = route_segments(path)
         let pats = route_segments(vec_get(r.patterns, i))
         if vec_len(ps) == vec_len(pats) {
             let mut ok: i64 = 1

@@ -36,6 +36,7 @@ fn fmr_bearer(ctx: FmrCtx) -> str {
 }
 
 // Requires valid HS256 JWT; sets ctx.user_sub from claim "sub".
+// Single decode: verify + parse claims once (no second jwt_claim_str pass).
 fn deps_bearer(ctx: FmrCtx) -> DepResult {
     let token = fmr_bearer(ctx)
     if token == "" {
@@ -45,11 +46,19 @@ fn deps_bearer(ctx: FmrCtx) -> DepResult {
     if payload == "" {
         return dep_fail(ctx, fmr_401("Invalid or expired token"))
     }
-    let sub = jwt_claim_str(token, "sub")
-    if sub == "" {
+    let b = jbody_parse_str(payload)
+    if b.ok == 0 {
+        return dep_fail(ctx, fmr_401("Token claims invalid"))
+    }
+    let bo = jbody_require_object(b)
+    if bo.ok == 0 {
+        return dep_fail(ctx, fmr_401("Token claims invalid"))
+    }
+    let f = jreq_str(bo.doc, bo.root, "sub")
+    if f.ok == 0 {
         return dep_fail(ctx, fmr_401("Token missing sub"))
     }
-    return dep_ok(fmr_set_user(ctx, sub))
+    return dep_ok(fmr_set_user(ctx, f.val))
 }
 
 // Optional bearer: if present must be valid; if absent continues unauthenticated.

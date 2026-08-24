@@ -65,6 +65,7 @@ fmrbaga/
 | `handlers` is optional | product apps implement their own `fmr_dispatch` |
 | Public re-exports at root | `import "fmrbaga/app.baga"` stays stable |
 | Prefer explicit layers | `import "fmrbaga/core/app.baga"` for new code |
+| No product knowledge in OpenAPI | body/ok schemas, tags, security come from route meta (`router_add_meta`); heuristics cover scaffold routes only |
 
 ## Serve runtime (workers)
 
@@ -97,6 +98,9 @@ fmrbaga/
 5. `join` all workers (busy ones leave when idle socket timeout fires)  
 6. Unpublish runtime stats; exit  
 
+**Startup validation** — `fmr_run` fails loud on duplicate route
+registrations (`router_validate`), before the listener accepts anything.
+
 **Stats handle** (`map_h`): inflight / accepted / completed / workers / mode.  
 Published under `/tmp/fmrbaga.rt.<pid>` for `fmr_rt_*` (used by `/metrics`).
 
@@ -104,6 +108,11 @@ Published under `/tmp/fmrbaga.rt.<pid>` for `fmr_rt_*` (used by `/metrics`).
 
 - **Route ids + optional L5 handlers** — `fmr_route_fn` stores the fn;
   `fmr_dispatch` remains the fallback for product apps.
+- **Route-level OpenAPI metadata** — `fmr_route_meta` / `fmr_route_fn_meta`
+  carry summary/tag/public/body/ok/code/query next to each route; the doc is
+  generated from the table, not from product hand tables.
+- **App state in ctx** — `FmrCtx` carries title/version/router
+  (`fmr_title` / `fmr_version` / `fmr_router`); handlers never re-load env.
 - **JSON-first API** — builders, 422 field errors, Bearer deps.
 - **Env config + OS-thread workers** — default pool of 4; one DB per worker.
 - **Universal** — no product tables. Scaffold is ops + JWT only.

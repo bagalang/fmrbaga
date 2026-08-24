@@ -3,6 +3,8 @@
 // core/app.baga.
 
 import "app.baga"
+import "config.baga"
+import "route.baga"
 
 struct FmrConnOut {
     code: i64,
@@ -319,15 +321,13 @@ fn fmr_run() -> i64 !Net !IO !Par !Random !Time {
     signal_watch(FMR_SIGINT())
 
     let port = fmr_listen_port()?
-    let sync_s = fmr_env_or("FMR_SYNC", "0")?
-    let bsync = env("BAGA_SYNC")?
-    let mut sync_mode = sync_s
-    if bsync == "1" {
-        sync_mode = "1"
+    let mut sync_mode = fmr_cfg_flag("FMR_SYNC")?
+    if fmr_cfg_flag("BAGA_SYNC")? == 1 {
+        sync_mode = 1
     }
     let mut workers = fmr_workers_n()?
     // FMR_SYNC wins: single-threaded accept+handle (debug / tests).
-    if sync_mode == "1" {
+    if sync_mode == 1 {
         workers = 0
     }
     let listener = tcp_listen(port)?
@@ -336,6 +336,14 @@ fn fmr_run() -> i64 !Net !IO !Par !Random !Time {
         return 1
     }
     let app = fmr_build_app()?
+    // Fail-loud: duplicate route registrations are a config bug, not a
+    // "first match wins" surprise at dispatch time.
+    let verr = router_validate(app.router)
+    if verr != "" {
+        print(concat("fmrbaga: ", verr))
+        tcp_close(listener)?
+        return 1
+    }
     print(concat(concat("fmrbaga ", app.title), concat(" v", app.version)))
 
     let pollfds: Vec<i64> = vec_new()
@@ -406,7 +414,7 @@ fn fmr_run() -> i64 !Net !IO !Par !Random !Time {
 
     // Serial or go_bg-per-connection modes.
     let mut mode: i64 = 0
-    if sync_mode == "1" {
+    if sync_mode == 1 {
         mode = 1
         print(concat("listening on :", concat(int_to_str(port), " (sync, graceful)")))
     } else {
@@ -428,7 +436,7 @@ fn fmr_run() -> i64 !Net !IO !Par !Random !Time {
                 if poll_has(pr.ready, listener) == 1 {
                     let fd = tcp_accept(listener)?
                     if fd >= 0 {
-                        if sync_mode == "1" {
+                        if sync_mode == 1 {
                             fmr_conn_begin(st2)
                             fmr_serve_conn(fd)?
                             fmr_conn_end(st2)
