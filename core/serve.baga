@@ -52,13 +52,15 @@ fn fmr_h1_conn(app: FmrApp, fd: i64, r0: HttpReader, db0: OrmDb, close_db: i64) 
             if http_method(out.req) == "" {
                 keep = false
             } else {
-                let ka = http_keepalive(out.req)
+                // One request per worker checkout. HTTP/1.1 keep-alive would
+                // leave the worker blocked in the next read until FMR_IDLE_S,
+                // pinning the pool (default 4) while Next.js opens more
+                // connections — /health and new pages hang; a write to a
+                // reset client used to SIGPIPE-kill the process.
                 let ho = fmr_handle(app, out.req, db)?
                 db = ho.db
-                http_respond_keepalive(fd, ho.resp, ka)?
-                if ka == 0 {
-                    keep = false
-                }
+                http_respond_keepalive(fd, ho.resp, 0)?
+                keep = false
             }
         }
     }
