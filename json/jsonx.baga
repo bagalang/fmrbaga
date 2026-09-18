@@ -235,17 +235,20 @@ fn jreq_str(d: JsonDoc, obj: i64, key: str) -> JField {
     return jfield_ok_str(json_str(d, n))
 }
 
-// Required integer (JSON number without fraction preferred; truncates f64).
+// Required integer. Accepts JSON number or a digit string from HTML forms.
 fn jreq_i64(d: JsonDoc, obj: i64, key: str) -> JField {
     let n = json_get(d, obj, key)
     if n < 0 {
         return jfield_missing(key)
     }
-    if json_tag(d, n) != 3 {
+    let t = json_tag(d, n)
+    if t != 3 && t != 4 {
         return jfield_type(key, "integer")
     }
     let raw = json_str(d, n)
-    // reject obvious floats for strict int API fields
+    if t == 4 && raw == "" {
+        return jfield_type(key, "integer")
+    }
     if str_find(raw, ".") >= 0 || str_find(raw, "e") >= 0 || str_find(raw, "E") >= 0 {
         return jfield_type(key, "integer")
     }
@@ -263,6 +266,16 @@ fn jreq_bool(d: JsonDoc, obj: i64, key: str) -> JField {
     }
     if t == 2 {
         return JField { ok: 1, err: "", err_type: "", val: "true", num: 1, present: 1 }
+    }
+    // HTML checkboxes and some clients send 0/1 instead of false/true.
+    if t == 3 {
+        let raw = json_str(d, n)
+        if raw == "0" {
+            return JField { ok: 1, err: "", err_type: "", val: "false", num: 0, present: 1 }
+        }
+        if raw == "1" {
+            return JField { ok: 1, err: "", err_type: "", val: "true", num: 1, present: 1 }
+        }
     }
     return jfield_type(key, "boolean")
 }
