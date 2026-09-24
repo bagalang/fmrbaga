@@ -122,6 +122,42 @@ fn route_param_name(seg: str) -> str {
     return substr(seg, 1, len(seg) - 1)
 }
 
+// "{*name}" — последният сегмент на шаблона, гълта остатъка от пътя
+// („a/b/c"), включително празен остатък. Нужен е на WebDAV, където
+// дълбочината не е фиксирана.
+fn route_is_rest(seg: str) -> i64 {
+    if len(seg) < 4 {
+        return 0
+    }
+    if char_at(seg, 0) != 123 {
+        return 0
+    }
+    if char_at(seg, 1) != 42 {
+        return 0
+    }
+    if char_at(seg, len(seg) - 1) != 125 {
+        return 0
+    }
+    return 1
+}
+
+fn route_rest_name(seg: str) -> str {
+    return substr(seg, 2, len(seg) - 1)
+}
+
+fn route_join_from(ps: Vec<str>, from: i64) -> str {
+    let mut s = ""
+    let mut i: i64 = from
+    while i < vec_len(ps) {
+        if i > from {
+            s = concat(s, "/")
+        }
+        s = concat(s, vec_get(ps, i))
+        i = i + 1
+    }
+    return s
+}
+
 struct RouteMatch {
     ok: i64,
     id: i64,
@@ -137,12 +173,29 @@ fn route_match_one(method: str, path: str, m: str, pattern: str, id: i64) -> Rou
     }
     let ps = route_segments(path)
     let pats = route_segments(pattern)
-    if vec_len(ps) != vec_len(pats) {
-        return RouteMatch { ok: 0, id: 0, pnames: empty_n, pvals: empty_v }
+    let mut rest_at: i64 = 0 - 1
+    if vec_len(pats) > 0 {
+        let last = vec_get(pats, vec_len(pats) - 1)
+        if route_is_rest(last) == 1 {
+            rest_at = vec_len(pats) - 1
+        }
+    }
+    if rest_at < 0 {
+        if vec_len(ps) != vec_len(pats) {
+            return RouteMatch { ok: 0, id: 0, pnames: empty_n, pvals: empty_v }
+        }
+    } else {
+        if vec_len(ps) < rest_at {
+            return RouteMatch { ok: 0, id: 0, pnames: empty_n, pvals: empty_v }
+        }
     }
     let names = vec_new()
     let vals = vec_new()
-    for i in 0..vec_len(pats) {
+    let mut limit = vec_len(pats)
+    if rest_at >= 0 {
+        limit = rest_at
+    }
+    for i in 0..limit {
         let pat = vec_get(pats, i)
         let got = vec_get(ps, i)
         if route_is_param(pat) == 1 {
@@ -153,6 +206,10 @@ fn route_match_one(method: str, path: str, m: str, pattern: str, id: i64) -> Rou
                 return RouteMatch { ok: 0, id: 0, pnames: empty_n, pvals: empty_v }
             }
         }
+    }
+    if rest_at >= 0 {
+        vec_push(names, route_rest_name(vec_get(pats, rest_at)))
+        vec_push(vals, route_join_from(ps, rest_at))
     }
     return RouteMatch { ok: 1, id: id, pnames: names, pvals: vals }
 }
@@ -175,13 +232,33 @@ fn router_path_exists(r: Router, path: str) -> i64 {
     let ps = route_segments(path)
     for i in 0..vec_len(r.ids) {
         let pats = route_segments(vec_get(r.patterns, i))
-        if vec_len(ps) == vec_len(pats) {
+        let mut rest_at: i64 = 0 - 1
+        if vec_len(pats) > 0 {
+            if route_is_rest(vec_get(pats, vec_len(pats) - 1)) == 1 {
+                rest_at = vec_len(pats) - 1
+            }
+        }
+        let mut comparable: i64 = 0
+        if rest_at < 0 {
+            if vec_len(ps) == vec_len(pats) {
+                comparable = 1
+            }
+        } else {
+            if vec_len(ps) >= rest_at {
+                comparable = 1
+            }
+        }
+        if comparable == 1 {
             let mut ok: i64 = 1
+            let mut stop = vec_len(pats)
+            if rest_at >= 0 {
+                stop = rest_at
+            }
             let mut j: i64 = 0
-            while j < vec_len(pats) && ok == 1 {
+            while j < stop && ok == 1 {
                 let pat = vec_get(pats, j)
                 let got = vec_get(ps, j)
-                if route_is_param(pat) == 0 {
+                if route_is_param(pat) == 0 && route_is_rest(pat) == 0 {
                     if pat != got {
                         ok = 0
                     }

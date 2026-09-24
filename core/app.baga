@@ -276,12 +276,16 @@ fn fmr_handle(app: FmrApp, req: Request, db: OrmDb) -> FmrOut !Random !Time !IO 
     let path = http_path_only(req)
     let rid = fmr_make_request_id(req)?
 
+    // OPTIONS без Access-Control-Request-Method не е CORS preflight.
+    // WebDAV го ползва за DAV/Allow и трябва да стигне до маршрута.
     if method == "OPTIONS" {
-        let mut r = fmr_no_content()
-        if app.cors_origin != "" {
-            r = fmr_cors(r, app.cors_origin)
+        if http_header(req, "Access-Control-Request-Method") != "" {
+            let mut r = fmr_no_content()
+            if app.cors_origin != "" {
+                r = fmr_cors(r, app.cors_origin)
+            }
+            return fmr_out(fmr_with_request_id(r, rid), db)
         }
-        return fmr_out(fmr_with_request_id(r, rid), db)
     }
 
     // B3 dual protocol: same port, application/grpc + /Service/Method
