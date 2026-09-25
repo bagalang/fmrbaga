@@ -58,7 +58,7 @@ fn fmr_no_content() -> Response {
 fn fmr_cors(resp: Response, origin: str) -> Response {
     let mut r = resp
     r = http_set_header(r, "Access-Control-Allow-Origin", origin)
-    r = http_set_header(r, "Access-Control-Allow-Headers", "Authorization, Content-Type")
+    r = http_set_header(r, "Access-Control-Allow-Headers", "Authorization, Content-Type, traceparent")
     r = http_set_header(r, "Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
     return r
 }

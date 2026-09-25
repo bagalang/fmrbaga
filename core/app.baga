@@ -305,10 +305,12 @@ fn fmr_handle(app: FmrApp, req: Request, db: OrmDb) -> FmrOut !Random !Time !IO 
 
     let m = router_match(app.router, method, path)
     if m.ok == 0 {
+        // 404/405 са същият път: клиентът пак получава traceparent.
+        let miss = fmr_mw_ids(fmr_ctx_new_app(req, m, app.jwt_secret, app.title, app.version, app.router), rid)?
         if router_path_exists(app.router, path) == 1 {
-            return fmr_out(fmr_finish(app, fmr_405("Method not allowed"), rid), db)
+            return fmr_out(fmr_finish_ctx(app, fmr_405("Method not allowed"), miss), db)
         }
-        return fmr_out(fmr_finish(app, fmr_404("Not found"), rid), db)
+        return fmr_out(fmr_finish_ctx(app, fmr_404("Not found"), miss), db)
     }
 
     let ctx0 = fmr_mw_ids(fmr_ctx_new_app(req, m, app.jwt_secret, app.title, app.version, app.router), rid)?
