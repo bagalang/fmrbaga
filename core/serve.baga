@@ -103,10 +103,11 @@ fn fmr_open_db(app: FmrApp) -> OrmDb !Net !IO !Random {
     return orm_connect(app.pg_host, app.pg_port, app.pg_user, app.pg_password, app.pg_database)?
 }
 
-// ---------- shared runtime stats (Map via map_h; process-local) ----------
+// ---------- shared runtime stats (frozen world + atomic wcache_add) ----------
 // Keys: 0=inflight  1=accepted  2=completed  3=workers  4=mode(0=gobg,1=sync,2=pool)
-// No mutex: counters are best-effort gauges (drain waits for inflight≈0).
-// Avoids forcing !Par onto every request handler.
+// W2.15/P45: counters live in a frozen world; wcache_add is atomic, so the
+// old unsynchronized map_set/map_get race (best-effort gauges) is gone.
+// The handle is still process-local and published by pid-scoped file.
 
 fn FMR_ST_INFLIGHT() -> i64 { return 0 }
 fn FMR_ST_ACCEPTED() -> i64 { return 1 }
@@ -114,31 +115,30 @@ fn FMR_ST_DONE() -> i64 { return 2 }
 fn FMR_ST_WORKERS() -> i64 { return 3 }
 fn FMR_ST_MODE() -> i64 { return 4 }
 
-// Handle = map_h(Map<i64,i64>)
+// Handle = frozen world; wcache_add is legal on frozen worlds.
 fn fmr_st_new(workers: i64, mode: i64) -> i64 {
-    let m: Map<i64, i64> = map_new()
-    map_set(m, FMR_ST_INFLIGHT(), 0)
-    map_set(m, FMR_ST_ACCEPTED(), 0)
-    map_set(m, FMR_ST_DONE(), 0)
-    map_set(m, FMR_ST_WORKERS(), workers)
-    map_set(m, FMR_ST_MODE(), mode)
-    return map_h(m)
+    let w = world_new()
+    world_freeze(w)
+    wcache_set(w, FMR_ST_INFLIGHT(), 0)
+    wcache_set(w, FMR_ST_ACCEPTED(), 0)
+    wcache_set(w, FMR_ST_DONE(), 0)
+    wcache_set(w, FMR_ST_WORKERS(), workers)
+    wcache_set(w, FMR_ST_MODE(), mode)
+    return w
 }
 
 fn fmr_st_get(st: i64, key: i64) -> i64 {
     if st == 0 {
         return 0
     }
-    let m: Map<i64, i64> = h_map(st)
-    return map_get(m, key)
+    return wcache_get(st, key)
 }
 
 fn fmr_st_add(st: i64, key: i64, delta: i64) -> i64 {
     if st == 0 {
         return 0
     }
-    let m: Map<i64, i64> = h_map(st)
-    map_set(m, key, map_get(m, key) + delta)
+    wcache_add(st, key, delta)
     return 0
 }
 

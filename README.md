@@ -226,7 +226,7 @@ cover only its own scaffold routes (`/health`, `/ready`, `/v1/meta`,
 ## Honesty
 
 - HTTP/1.1 only in the framework loop (h2 stays in httpdbaga).
-- Runtime gauges are best-effort (shared map without mutex; fine for ops).
+- Runtime gauges live in a frozen world and use atomic `wcache_add` (W2.15); no data race and no !Par on handlers.
 - OpenAPI has real schemas + Bearer security; not every error variant is listed.
 - CORS headers (incl. OPTIONS preflight answers) are emitted only when
   `FMR_CORS` is set — disabled CORS means no CORS headers at all.

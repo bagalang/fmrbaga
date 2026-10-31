@@ -64,7 +64,7 @@ app-defined hook (`fmr_before`) plus the built-in correlation chain.
 **Was.** SCRAM cost on each new HTTP connection under `go_bg`.
 
 **Now.** Default is `FMR_WORKERS=4` (fixed pool, 1 long-lived DB per OS
-thread). Explicit `FMR_WORKERS=0` keeps go_bg-per-conn. Shared stats track
+thread). Explicit `FMR_WORKERS=0` keeps go_bg-per-conn. Frozen-world stats track
 inflight/accepted/completed.
 
 ## G9 — PORT clamp — **closed 2026-08-24**
@@ -89,7 +89,7 @@ join workers. Client sockets use `FMR_IDLE_S` SO_RCVTIMEO so keep-alive does
 not pin workers forever. Runtime gauges via `fmr_rt_*` (shared map_h).
 
 **Residual.** go_bg mode cannot join detached threads (drain waits on inflight
-only). Stats counters are best-effort (no mutex — avoid !Par on every handler).
+only). Stats counters live in a frozen world with atomic `wcache_add` — no mutex/!Par on handlers (W2.15/P45).
 
 ## G9 — Dual protocol gRPC (B3.3 partial)
 
