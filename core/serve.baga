@@ -254,11 +254,15 @@ fn fmr_serve_conn(fd: i64) -> i64 !IO !Net !Random !Time {
 
 // go_bg entry: ctx = cell2(fd, stats_handle)
 fn fmr_serve_conn_st(ctx: i64) -> i64 !IO !Net !Par !Random !Time {
+    // P51: свързващ mark за цялата връзка (startup преди turn rewind).
+    let conn_mark = mem_mark()
     let fd = cell2_0(ctx)
     let st = cell2_1(ctx)
+    cell2_free(ctx)
     fmr_conn_begin(st)
     let code = fmr_serve_conn(fd)?
     fmr_conn_end(st)
+    mem_rewind(conn_mark)
     return code
 }
 
