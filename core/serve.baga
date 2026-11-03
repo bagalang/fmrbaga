@@ -94,9 +94,13 @@ fn fmr_listen_port() -> i64 !IO {
 }
 
 // Open a session. ORM_BACKEND=boila|boiladb → boilabaga (PG wire :6575);
+// ORM_BACKEND=drock → rocksbaga KV (:16579, DROCK_HOST/DROCK_PORT);
 // otherwise use app DSN (Postgres PG* / fmr_app_db).
 fn fmr_open_db(app: FmrApp) -> OrmDb !Net !IO !Random {
     let be = fmr_cfg_or("ORM_BACKEND", "pg")?
+    if be == "drock" || be == "rocks" || be == "rocksbaga" {
+        return orm_connect_drock_env()?
+    }
     if be == "boila" || be == "boiladb" || be == "boilaDB" {
         return orm_connect_boila_env()?
     }
