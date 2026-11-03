@@ -330,7 +330,10 @@ fn fmr_handle(app: FmrApp, req: Request, db: OrmDb) -> FmrOut !Random !Time !IO 
     if app.log_requests == 1 {
         fmr_mw_log(before.ctx, method, path, out.resp.status)?
     }
-    return fmr_out(fmr_finish_ctx(app, out.resp, before.ctx), out.db)
+    // Ръката на action-а не е гарантирана: остави ли отворена транзакция,
+    // тя иначе преминава в следващата заявка по същия worker.
+    let mut endb = orm_guard_txn(out.db)?
+    return fmr_out(fmr_finish_ctx(app, out.resp, before.ctx), endb)
 }
 
 // Result of serving one TCP connection (updated DB session for reuse).
